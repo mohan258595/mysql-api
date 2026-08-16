@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Student Management</title>
+</head>
+
+<body>
+
+    <h1>Student Management</h1>
+
+    <input
+        type="number"
+        id="id"
+        placeholder="Student ID"
+    >
+
+    <input
+        type="text"
+        id="name"
+        placeholder="Student Name"
+    >
+
+    <button onclick="insertStudent()">
+        Insert Student
+    </button>
+
+    <p id="message"></p>
+
+    <hr>
+
+    <h2>Students</h2>
+
+    <table border="1">
+
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+            </tr>
+        </thead>
+
+        <tbody id="studentTable">
+        </tbody>
+
+    </table>
+
+    <script>
+
+        // INSERT STUDENT
+        async function insertStudent() {
+
+            const id =
+                document.getElementById("id").value;
+
+            const name =
+                document.getElementById("name").value;
+
+            const response = await fetch(
+                "http://localhost:3000/students",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        id: Number(id),
+                        name: name
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            document.getElementById("message").innerText =
+                data.message || data.error;
+
+            // Clear input
+            document.getElementById("id").value = "";
+            document.getElementById("name").value = "";
+
+            // Refresh table
+            loadStudents();
+        }
+
+
+        // LOAD ALL STUDENTS
+        async function loadStudents() {
+
+            const response = await fetch(
+                "http://localhost:3000/students"
+            );
+
+            const students = await response.json();
+
+            const table =
+                document.getElementById("studentTable");
+
+            table.innerHTML = "";
+
+            students.forEach(student => {
+
+                const row = `
+                    <tr>
+                        <td>${student.id}</td>
+                        <td>${student.name}</td>
+                    </tr>
+                `;
+
+                table.innerHTML += row;
+            });
+        }
+
+
+        // LOAD DATA WHEN PAGE OPENS
+        loadStudents();
+
+    </script>
+
+</body>
+
+</html>
