@@ -47,7 +47,7 @@ app.post("/students", (req, res) => {
 // GET ALL STUDENTS
 app.get("/students", (req, res) => {
 
-    const sql = '"SELECT * FROM students where name="mohan"';
+    const sql = "SELECT * FROM students ";
 
     db.query(sql, (err, results) => {
 
