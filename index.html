@@ -1,63 +1,480 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
     <title>Student Management</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .header {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .header h1 {
+            margin-bottom: 8px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: red;
+        }
+
+        .status-dot.connected {
+            background: green;
+        }
+
+        .form-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .form-card h2 {
+            margin-bottom: 20px;
+        }
+
+        .form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input {
+            flex: 1;
+            min-width: 180px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        button {
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .add-btn {
+            background: #2563eb;
+            color: white;
+        }
+
+        .add-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .students-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .students-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .count {
+            background: #e8f0ff;
+            color: #2563eb;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8fafc;
+        }
+
+        .delete-btn {
+            background: #ef4444;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 30px;
+            color: #888;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+    </style>
+
 </head>
 
 <body>
 
-    <h1>Student Management</h1>
+<div class="container">
 
-    <input
-        type="number"
-        id="id"
-        placeholder="Student ID"
-    >
+    <div class="header">
 
-    <input
-        type="text"
-        id="name"
-        placeholder="Student Name"
-    >
+        <h1>Student Management</h1>
 
-    <button onclick="insertStudent()">
-        Insert Student
-    </button>
+        <div class="status">
 
-    <p id="message"></p>
+            <div id="statusDot"
+                 class="status-dot">
+            </div>
 
-    <hr>
+            <span id="statusText">
+                Connecting...
+            </span>
 
-    <h2>Students</h2>
+        </div>
 
-    <table border="1">
+    </div>
 
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-            </tr>
-        </thead>
 
-        <tbody id="studentTable">
-        </tbody>
+    <!-- ADD STUDENT -->
 
-    </table>
+    <div class="form-card">
 
-    <script>
+        <h2>Add Student</h2>
 
-        // INSERT STUDENT
-        async function insertStudent() {
+        <div class="form">
 
-            const id =
-                document.getElementById("id").value;
+            <input
+                type="number"
+                id="studentId"
+                placeholder="Student ID">
 
-            const name =
-                document.getElementById("name").value;
+            <input
+                type="text"
+                id="studentName"
+                placeholder="Student Name">
+
+            <button
+                class="add-btn"
+                onclick="addStudent()">
+
+                Add Student
+
+            </button>
+
+        </div>
+
+        <div id="message"
+             class="message">
+        </div>
+
+    </div>
+
+
+    <!-- STUDENTS -->
+
+    <div class="students-card">
+
+        <div class="students-header">
+
+            <h2>Students</h2>
+
+            <span
+                id="studentCount"
+                class="count">
+
+                0 Students
+
+            </span>
+
+        </div>
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Action</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody id="studentTable">
+
+            </tbody>
+
+        </table>
+
+        <div id="emptyMessage"
+             class="empty">
+
+            Loading students...
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- Socket.IO client -->
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+
+    // =============================
+    // CONNECT SOCKET.IO
+    // =============================
+
+    const socket = io();
+
+
+    socket.on("connect", () => {
+
+        console.log("Socket connected:", socket.id);
+
+        document.getElementById("statusDot")
+            .classList.add("connected");
+
+        document.getElementById("statusText")
+            .textContent = "Connected to server";
+
+        // Load students immediately
+        loadStudents();
+
+    });
+
+
+    socket.on("disconnect", () => {
+
+        console.log("Socket disconnected");
+
+        document.getElementById("statusDot")
+            .classList.remove("connected");
+
+        document.getElementById("statusText")
+            .textContent = "Disconnected";
+
+    });
+
+
+    // =============================
+    // LIVE DATABASE CHANGES
+    // =============================
+
+    socket.on("studentsChanged", (data) => {
+
+        console.log("Database changed:", data);
+
+        // Reload students automatically
+        loadStudents();
+
+    });
+
+
+    // =============================
+    // LOAD STUDENTS
+    // =============================
+
+    async function loadStudents() {
+
+        try {
+
+            const response = await fetch("/students");
+
+            if (!response.ok) {
+                throw new Error("Failed to load students");
+            }
+
+            const students = await response.json();
+
+            displayStudents(students);
+
+        }
+        catch (error) {
+
+            console.error(error);
+
+            showMessage(
+                "Unable to load students",
+                "error"
+            );
+
+        }
+
+    }
+
+
+    // =============================
+    // DISPLAY STUDENTS
+    // =============================
+
+    function displayStudents(students) {
+
+        const table =
+            document.getElementById("studentTable");
+
+        const emptyMessage =
+            document.getElementById("emptyMessage");
+
+        const count =
+            document.getElementById("studentCount");
+
+        table.innerHTML = "";
+
+        count.textContent =
+            `${students.length} Student${students.length !== 1 ? "s" : ""}`;
+
+
+        if (students.length === 0) {
+
+            emptyMessage.style.display = "block";
+
+            emptyMessage.textContent =
+                "No students found";
+
+            return;
+
+        }
+
+
+        emptyMessage.style.display = "none";
+
+
+        students.forEach(student => {
+
+            const row =
+                document.createElement("tr");
+
+
+            row.innerHTML = `
+
+                <td>${student.id}</td>
+
+                <td>${student.name}</td>
+
+                <td>
+
+                    <button
+                        class="delete-btn"
+                        onclick="deleteStudent(${student.id})">
+
+                        Delete
+
+                    </button>
+
+                </td>
+
+            `;
+
+
+            table.appendChild(row);
+
+        });
+
+    }
+
+
+    // =============================
+    // ADD STUDENT
+    // =============================
+
+    async function addStudent() {
+
+        const id =
+            document.getElementById("studentId").value;
+
+        const name =
+            document.getElementById("studentName").value.trim();
+
+
+        if (!id || !name) {
+
+            showMessage(
+                "Please enter ID and name",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        try {
 
             const response = await fetch(
-                "http://localhost:3000/students",
+                "/students",
                 {
                     method: "POST",
 
@@ -72,53 +489,122 @@
                 }
             );
 
+
             const data = await response.json();
 
-            document.getElementById("message").innerText =
-                data.message || data.error;
 
-            // Clear input
-            document.getElementById("id").value = "";
-            document.getElementById("name").value = "";
+            if (!response.ok) {
 
-            // Refresh table
-            loadStudents();
-        }
+                throw new Error(
+                    data.error || "Failed to add student"
+                );
+
+            }
 
 
-        // LOAD ALL STUDENTS
-        async function loadStudents() {
+            document.getElementById("studentId").value = "";
+            document.getElementById("studentName").value = "";
 
-            const response = await fetch(
-                "http://localhost:3000/students"
+
+            showMessage(
+                "Student added successfully",
+                "success"
             );
 
-            const students = await response.json();
+        }
+        catch (error) {
 
-            const table =
-                document.getElementById("studentTable");
+            showMessage(
+                error.message,
+                "error"
+            );
 
-            table.innerHTML = "";
+        }
 
-            students.forEach(student => {
+    }
 
-                const row = `
-                    <tr>
-                        <td>${student.id}</td>
-                        <td>${student.name}</td>
-                    </tr>
-                `;
 
-                table.innerHTML += row;
-            });
+    // =============================
+    // DELETE STUDENT
+    // =============================
+
+    async function deleteStudent(id) {
+
+        if (!confirm(
+            "Are you sure you want to delete this student?"
+        )) {
+            return;
         }
 
 
-        // LOAD DATA WHEN PAGE OPENS
-        loadStudents();
+        try {
 
-    </script>
+            const response = await fetch(
+                `/students/${id}`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+
+            const data = await response.json();
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data.error || "Delete failed"
+                );
+
+            }
+
+
+            showMessage(
+                "Student deleted successfully",
+                "success"
+            );
+
+        }
+        catch (error) {
+
+            showMessage(
+                error.message,
+                "error"
+            );
+
+        }
+
+    }
+
+
+    // =============================
+    // MESSAGE
+    // =============================
+
+    function showMessage(text, type) {
+
+        const message =
+            document.getElementById("message");
+
+        message.textContent = text;
+
+        message.className =
+            `message ${type}`;
+
+        message.style.display = "block";
+
+
+        setTimeout(() => {
+
+            message.style.display = "none";
+
+        }, 3000);
+
+    }
+
+</script>
 
 </body>
 
 </html>
+
