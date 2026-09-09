@@ -1,42 +1,79 @@
-// =============================
+// ============================================================
 // LOAD ENVIRONMENT VARIABLES
-// =============================
+// ============================================================
+
 require("dotenv").config();
+
+
+// ============================================================
+// IMPORT MODULES
+// ============================================================
 
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
 const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
 
 
-// =============================
+// ============================================================
 // CREATE EXPRESS APP
-// =============================
+// ============================================================
+
 const app = express();
 
 
-// =============================
+// ============================================================
+// CREATE HTTP SERVER
+// ============================================================
+
+const server = http.createServer(app);
+
+
+// ============================================================
+// CREATE SOCKET.IO SERVER
+// ============================================================
+
+const io = new Server(server, {
+
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST", "PUT", "DELETE"]
+    }
+
+});
+
+
+// ============================================================
 // MIDDLEWARE
-// =============================
+// ============================================================
+
 app.use(cors());
+
 app.use(express.json());
 
+app.use(express.urlencoded({
+    extended: true
+}));
 
-// =============================
+
+// ============================================================
 // SERVE FRONTEND
-// =============================
+// ============================================================
+
 app.use(express.static(__dirname));
 
 
-// =============================
+// ============================================================
 // REQUEST LOGGER
-// =============================
+// ============================================================
+
 app.use((req, res, next) => {
 
     const time = new Date().toLocaleString();
 
     console.log("=================================");
-
     console.log(`[${time}] ${req.method} ${req.originalUrl}`);
 
     next();
@@ -44,14 +81,15 @@ app.use((req, res, next) => {
 });
 
 
-// =============================
+// ============================================================
 // MYSQL CLOUD CONNECTION
-// =============================
+// ============================================================
+
 const db = mysql.createPool({
 
     host: process.env.DB_HOST,
 
-    port: Number(process.env.DB_PORT),
+    port: Number(process.env.DB_PORT || 3306),
 
     user: process.env.DB_USER,
 
@@ -72,16 +110,42 @@ const db = mysql.createPool({
 });
 
 
-// =============================
+// ============================================================
+// SOCKET LOGGER HELPER
+// ============================================================
+
+function socketLog(message, type = "info") {
+
+    console.log(message);
+
+    io.emit("terminal-log", {
+
+        message,
+        type,
+        time: new Date().toLocaleTimeString()
+
+    });
+
+}
+
+
+// ============================================================
 // TEST MYSQL CONNECTION
-// =============================
+// ============================================================
+
 db.getConnection((err, connection) => {
 
     if (err) {
 
-        console.error("❌ MySQL connection failed:");
-
+        console.error("=================================");
+        console.error("❌ MySQL connection failed");
         console.error(err.message);
+        console.error("=================================");
+
+        socketLog(
+            `MYSQL CONNECTION FAILED - ${err.message}`,
+            "error"
+        );
 
         return;
 
@@ -89,17 +153,58 @@ db.getConnection((err, connection) => {
 
     console.log("=================================");
     console.log("✅ Cloud MySQL connected!");
+    console.log(`Host: ${process.env.DB_HOST}`);
     console.log(`Database: ${process.env.DB_NAME}`);
     console.log("=================================");
+
+    socketLog(
+        `MYSQL CONNECTED - Database: ${process.env.DB_NAME}`,
+        "success"
+    );
 
     connection.release();
 
 });
 
 
-// =============================
+// ============================================================
+// SOCKET.IO CONNECTION
+// ============================================================
+
+io.on("connection", (socket) => {
+
+    console.log("=================================");
+    console.log("🔌 Socket.IO client connected");
+    console.log(`Socket ID: ${socket.id}`);
+    console.log("=================================");
+
+
+    socket.emit("terminal-log", {
+
+        message: `Socket.IO connected - ${socket.id}`,
+
+        type: "success",
+
+        time: new Date().toLocaleTimeString()
+
+    });
+
+
+    socket.on("disconnect", () => {
+
+        console.log(
+            `🔌 Socket disconnected - ${socket.id}`
+        );
+
+    });
+
+});
+
+
+// ============================================================
 // HOME PAGE
-// =============================
+// ============================================================
+
 app.get("/", (req, res) => {
 
     console.log("🏠 Home page requested");
@@ -111,9 +216,10 @@ app.get("/", (req, res) => {
 });
 
 
-// =============================
-// TEST API
-// =============================
+// ============================================================
+// API TEST
+// ============================================================
+
 app.get("/api/test", (req, res) => {
 
     console.log("🧪 API test requested");
@@ -122,31 +228,74 @@ app.get("/api/test", (req, res) => {
 
         message: "API is working!",
 
-        database: process.env.DB_NAME
+        database: process.env.DB_NAME,
+
+        socket: "Socket.IO enabled"
 
     });
 
 });
 
 
-// =============================
+// ============================================================
+// DATABASE STATUS
+// ============================================================
+
+app.get("/api/db-status", (req, res) => {
+
+    db.query("SELECT 1 AS connected", (err, results) => {
+
+        if (err) {
+
+            return res.status(500).json({
+
+                connected: false,
+
+                error: err.message
+
+            });
+
+        }
+
+        res.json({
+
+            connected: true,
+
+            database: process.env.DB_NAME,
+
+            host: process.env.DB_HOST
+
+        });
+
+    });
+
+});
+
+
+// ============================================================
 // GET ALL STUDENTS
-// =============================
+// ============================================================
+
 app.get("/students", (req, res) => {
 
     const startTime = Date.now();
 
-    console.log("📖 READ - Getting all students...");
+    socketLog(
+        "GET /students",
+        "info"
+    );
 
 
-    const sql =
-        "SELECT * FROM students ORDER BY id";
+    const sql = `
+        SELECT *
+        FROM students
+        ORDER BY id
+    `;
 
 
     db.query(sql, (err, results) => {
 
-        const time =
-            new Date().toLocaleString();
+        const time = new Date().toLocaleString();
 
 
         if (err) {
@@ -158,6 +307,11 @@ app.get("/students", (req, res) => {
             console.error(
                 "Error:",
                 err.message
+            );
+
+            socketLog(
+                `READ FAILED - ${err.message}`,
+                "error"
             );
 
             return res.status(500).json({
@@ -182,6 +336,12 @@ app.get("/students", (req, res) => {
         );
 
 
+        socketLog(
+            `READ SUCCESS - ${results.length} students`,
+            "success"
+        );
+
+
         res.json(results);
 
     });
@@ -189,25 +349,26 @@ app.get("/students", (req, res) => {
 });
 
 
-// =============================
+// ============================================================
 // CREATE STUDENT
-// =============================
+// ============================================================
+
 app.post("/students", (req, res) => {
 
     const { id, name } = req.body;
 
 
-    console.log("🟢 CREATE - Adding student");
-
-    console.log(`ID: ${id}`);
-
-    console.log(`Name: ${name}`);
+    socketLog(
+        `CREATE - ID: ${id}, Name: ${name}`,
+        "info"
+    );
 
 
     if (!id || !name) {
 
-        console.log(
-            "❌ CREATE FAILED - ID and name required"
+        socketLog(
+            "CREATE FAILED - ID and name required",
+            "error"
         );
 
         return res.status(400).json({
@@ -241,9 +402,15 @@ app.post("/students", (req, res) => {
                 );
 
                 console.error(
-                    "Error:",
                     err.message
                 );
+
+
+                socketLog(
+                    `CREATE FAILED - ${err.message}`,
+                    "error"
+                );
+
 
                 return res.status(500).json({
 
@@ -258,17 +425,21 @@ app.post("/students", (req, res) => {
                 `[${time}] ✅ CREATE SUCCESS`
             );
 
-            console.log(
-                `Student ID: ${id}`
+
+            socketLog(
+                `CREATE SUCCESS - Student ${id}`,
+                "success"
             );
 
-            console.log(
-                `Student Name: ${name}`
-            );
 
-            console.log(
-                `Inserted rows: ${result.affectedRows}`
-            );
+            // Send real-time event
+            io.emit("student-created", {
+
+                id: id,
+
+                name: name
+
+            });
 
 
             res.json({
@@ -292,9 +463,10 @@ app.post("/students", (req, res) => {
 });
 
 
-// =============================
+// ============================================================
 // UPDATE STUDENT
-// =============================
+// ============================================================
+
 app.put("/students/:id", (req, res) => {
 
     const id = req.params.id;
@@ -302,17 +474,17 @@ app.put("/students/:id", (req, res) => {
     const { name } = req.body;
 
 
-    console.log("🟡 UPDATE - Updating student");
-
-    console.log(`Student ID: ${id}`);
-
-    console.log(`New Name: ${name}`);
+    socketLog(
+        `UPDATE - ID: ${id}, Name: ${name}`,
+        "info"
+    );
 
 
     if (!name) {
 
-        console.log(
-            "❌ UPDATE FAILED - Name required"
+        socketLog(
+            "UPDATE FAILED - Name required",
+            "error"
         );
 
         return res.status(400).json({
@@ -342,13 +514,9 @@ app.put("/students/:id", (req, res) => {
 
             if (err) {
 
-                console.error(
-                    `[${time}] ❌ UPDATE FAILED`
-                );
-
-                console.error(
-                    "Error:",
-                    err.message
+                socketLog(
+                    `UPDATE FAILED - ${err.message}`,
+                    "error"
                 );
 
                 return res.status(500).json({
@@ -362,8 +530,9 @@ app.put("/students/:id", (req, res) => {
 
             if (result.affectedRows === 0) {
 
-                console.log(
-                    `[${time}] ⚠️ UPDATE FAILED - Student not found`
+                socketLog(
+                    `UPDATE FAILED - Student ${id} not found`,
+                    "warning"
                 );
 
                 return res.status(404).json({
@@ -375,17 +544,20 @@ app.put("/students/:id", (req, res) => {
             }
 
 
-            console.log(
-                `[${time}] ✅ UPDATE SUCCESS`
+            socketLog(
+                `UPDATE SUCCESS - Student ${id}`,
+                "success"
             );
 
-            console.log(
-                `Student ID: ${id}`
-            );
 
-            console.log(
-                `New Name: ${name}`
-            );
+            // Real-time update
+            io.emit("student-updated", {
+
+                id: id,
+
+                name: name
+
+            });
 
 
             res.json({
@@ -401,18 +573,18 @@ app.put("/students/:id", (req, res) => {
 });
 
 
-// =============================
+// ============================================================
 // DELETE STUDENT
-// =============================
+// ============================================================
+
 app.delete("/students/:id", (req, res) => {
 
     const id = req.params.id;
 
 
-    console.log("🔴 DELETE - Deleting student");
-
-    console.log(
-        `Student ID: ${id}`
+    socketLog(
+        `DELETE - Student ID: ${id}`,
+        "info"
     );
 
 
@@ -433,13 +605,9 @@ app.delete("/students/:id", (req, res) => {
 
             if (err) {
 
-                console.error(
-                    `[${time}] ❌ DELETE FAILED`
-                );
-
-                console.error(
-                    "Error:",
-                    err.message
+                socketLog(
+                    `DELETE FAILED - ${err.message}`,
+                    "error"
                 );
 
                 return res.status(500).json({
@@ -453,8 +621,9 @@ app.delete("/students/:id", (req, res) => {
 
             if (result.affectedRows === 0) {
 
-                console.log(
-                    `[${time}] ⚠️ DELETE FAILED - Student not found`
+                socketLog(
+                    `DELETE FAILED - Student ${id} not found`,
+                    "warning"
                 );
 
                 return res.status(404).json({
@@ -466,17 +635,18 @@ app.delete("/students/:id", (req, res) => {
             }
 
 
-            console.log(
-                `[${time}] ✅ DELETE SUCCESS`
+            socketLog(
+                `DELETE SUCCESS - Student ${id}`,
+                "success"
             );
 
-            console.log(
-                `Student ID: ${id}`
-            );
 
-            console.log(
-                `Deleted rows: ${result.affectedRows}`
-            );
+            // Real-time update
+            io.emit("student-deleted", {
+
+                id: id
+
+            });
 
 
             res.json({
@@ -492,16 +662,257 @@ app.delete("/students/:id", (req, res) => {
 });
 
 
-// =============================
-// LOCAL SERVER
-// =============================
+// ============================================================
+// SQL TERMINAL
+// ============================================================
+
+app.post("/api/sql", (req, res) => {
+
+    const startTime = Date.now();
+
+    const { query, adminKey } = req.body;
+
+
+    // --------------------------------------------------------
+    // ADMIN KEY CHECK
+    // --------------------------------------------------------
+
+    if (
+        process.env.SQL_ADMIN_KEY &&
+        adminKey !== process.env.SQL_ADMIN_KEY
+    ) {
+
+        socketLog(
+            "SQL TERMINAL ACCESS DENIED",
+            "error"
+        );
+
+        return res.status(403).json({
+
+            error: "Invalid SQL terminal key"
+
+        });
+
+    }
+
+
+    // --------------------------------------------------------
+    // VALIDATE QUERY
+    // --------------------------------------------------------
+
+    if (
+        !query ||
+        typeof query !== "string" ||
+        !query.trim()
+    ) {
+
+        return res.status(400).json({
+
+            error: "SQL query is required"
+
+        });
+
+    }
+
+
+    const cleanQuery = query.trim();
+
+
+    // --------------------------------------------------------
+    // LOG QUERY
+    // --------------------------------------------------------
+
+    socketLog(
+        `SQL> ${cleanQuery}`,
+        "info"
+    );
+
+
+    console.log("=================================");
+    console.log("SQL TERMINAL QUERY");
+    console.log(cleanQuery);
+    console.log("=================================");
+
+
+    // --------------------------------------------------------
+    // EXECUTE QUERY
+    // --------------------------------------------------------
+
+    db.query(
+        cleanQuery,
+        (err, results, fields) => {
+
+            const executionTime =
+                Date.now() - startTime;
+
+
+            // ------------------------------------------------
+            // SQL ERROR
+            // ------------------------------------------------
+
+            if (err) {
+
+                console.error(
+                    "❌ SQL ERROR:",
+                    err.message
+                );
+
+
+                socketLog(
+                    `SQL ERROR - ${err.message}`,
+                    "error"
+                );
+
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    error: err.message,
+
+                    query: cleanQuery,
+
+                    executionTime
+
+                });
+
+            }
+
+
+            // ------------------------------------------------
+            // SQL SUCCESS
+            // ------------------------------------------------
+
+            socketLog(
+                `SQL SUCCESS - ${executionTime} ms`,
+                "success"
+            );
+
+
+            let rows = [];
+
+            let resultType = "unknown";
+
+
+            // SELECT / SHOW / DESCRIBE
+            if (Array.isArray(results)) {
+
+                rows = results;
+
+                resultType = "rows";
+
+            }
+
+            // INSERT / UPDATE / DELETE / CREATE
+            else {
+
+                resultType = "result";
+
+            }
+
+
+            // ------------------------------------------------
+            // SEND RESULT
+            // ------------------------------------------------
+
+            res.json({
+
+                success: true,
+
+                query: cleanQuery,
+
+                resultType,
+
+                results: rows,
+
+                affectedRows:
+                    results.affectedRows !== undefined
+                        ? results.affectedRows
+                        : null,
+
+                insertId:
+                    results.insertId !== undefined
+                        ? results.insertId
+                        : null,
+
+                executionTime,
+
+                fields: fields
+                    ? fields.map(field => field.name)
+                    : []
+
+            });
+
+
+            // ------------------------------------------------
+            // BROADCAST DATABASE CHANGE
+            // ------------------------------------------------
+
+            const upperQuery =
+                cleanQuery.toUpperCase();
+
+
+            if (
+                upperQuery.startsWith("INSERT") ||
+                upperQuery.startsWith("UPDATE") ||
+                upperQuery.startsWith("DELETE") ||
+                upperQuery.startsWith("CREATE") ||
+                upperQuery.startsWith("ALTER") ||
+                upperQuery.startsWith("DROP") ||
+                upperQuery.startsWith("TRUNCATE")
+            ) {
+
+                io.emit("database-changed", {
+
+                    query: cleanQuery,
+
+                    time:
+                        new Date().toLocaleTimeString()
+
+                });
+
+
+                socketLog(
+                    "DATABASE CHANGED - Live clients notified",
+                    "warning"
+                );
+
+            }
+
+        }
+    );
+
+});
+
+
+// ============================================================
+// SERVER ERROR HANDLER
+// ============================================================
+
+app.use((err, req, res, next) => {
+
+    console.error("SERVER ERROR:", err);
+
+    res.status(500).json({
+
+        error: "Internal server error"
+
+    });
+
+});
+
+
+// ============================================================
+// START SERVER
+// ============================================================
+
 if (require.main === module) {
 
     const PORT =
         process.env.PORT || 3000;
 
 
-    app.listen(
+    server.listen(
         PORT,
         () => {
 
@@ -510,7 +921,10 @@ if (require.main === module) {
             console.log("🚀 STUDENT API SERVER");
             console.log("=================================");
             console.log(
-                `API running at: http://localhost:${PORT}`
+                `API: http://localhost:${PORT}`
+            );
+            console.log(
+                `Socket.IO: ENABLED`
             );
             console.log(
                 `Database: ${process.env.DB_NAME}`
@@ -524,7 +938,12 @@ if (require.main === module) {
 }
 
 
-// =============================
-// EXPORT FOR VERCEL
-// =============================
-module.exports = app;
+// ============================================================
+// EXPORT
+// ============================================================
+
+module.exports = {
+    app,
+    server,
+    io
+};
